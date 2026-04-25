@@ -1,0 +1,193 @@
+# Golden questions for 3-table schema: anonymized_incity_orders, driver_daily_stats, passenger_daily_stats
+# forbidden_keywords: if any appear in generated SQL → FAIL (catches old-schema hallucinations)
+
+golden_questions:
+  - question: "Покажи отмены по городам за прошлую неделю"
+    expected_tables: [anonymized_incity_orders, cities]
+    expected_keywords: [clientcancel_timestamp, drivercancel_timestamp, city_id, "GROUP BY"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM orders", "FROM payments", "FROM trips", "FROM drivers", "FROM users", "status = 'cancelled'"]
+
+  - question: "Динамика выручки за последние 30 дней"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: [price_order_local, driverdone_timestamp, order_timestamp, "GROUP BY", "DATE_TRUNC"]
+    expected_chart: line
+    forbidden_keywords: ["FROM payments", "p.amount", "status = 'succeeded'"]
+
+  - question: "Топ 5 городов по числу заказов за месяц"
+    expected_tables: [anonymized_incity_orders, cities]
+    expected_keywords: [city_id, "COUNT", "GROUP BY", "LIMIT 5"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM orders", "FROM payments"]
+
+  - question: "Средний чек по городам"
+    expected_tables: [anonymized_incity_orders, cities]
+    expected_keywords: [price_order_local, "AVG", city_id, "GROUP BY"]
+    expected_chart: bar
+    forbidden_keywords: ["total_amount", "FROM orders"]
+
+  - question: "Процент отмен по городам за 30 дней"
+    expected_tables: [anonymized_incity_orders, cities]
+    expected_keywords: [clientcancel_timestamp, drivercancel_timestamp, city_id, "GROUP BY"]
+    expected_chart: bar
+    forbidden_keywords: ["status = 'cancelled'", "FROM orders"]
+
+  - question: "Сравни заказы этой и прошлой недели"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: ["COUNT", "UNION", order_timestamp, "DATE_TRUNC", week]
+    expected_chart: bar
+    forbidden_keywords: ["FROM orders", "FROM payments"]
+
+  - question: "Заказы по часам за сегодня"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: ["EXTRACT", "HOUR", order_timestamp, "GROUP BY"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM orders", "created_at"]
+
+  - question: "Распределение заказов по статусам"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: [status_order, "COUNT", "GROUP BY"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM orders", "status ="]
+
+  - question: "Средняя длительность поездки по городам"
+    expected_tables: [anonymized_incity_orders, cities]
+    expected_keywords: [duration_in_seconds, "AVG", city_id, "GROUP BY"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM trips", "ended_at", "started_at"]
+
+  - question: "Среднее время подачи водителя по городам"
+    expected_tables: [anonymized_incity_orders, cities]
+    expected_keywords: [driverarrived_timestamp, driveraccept_timestamp, "AVG", city_id]
+    expected_chart: bar
+    forbidden_keywords: ["FROM drivers", "FROM trips"]
+
+  - question: "Топ 10 водителей по выручке за неделю"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: [driver_id, price_order_local, "SUM", "GROUP BY", "LIMIT 10"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM drivers", "d.name", "FROM payments"]
+
+  - question: "Воронка заказов за 7 дней"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: [driveraccept_timestamp, driverdone_timestamp, "COUNT", "CASE"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM orders", "FROM trips"]
+
+  - question: "Сколько уникальных клиентов было в этом месяце"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: ["COUNT(DISTINCT", user_id, order_timestamp]
+    expected_chart: kpi
+    forbidden_keywords: ["FROM users", "role = 'client'"]
+
+  - question: "Сколько активных водителей на прошлой неделе"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: ["COUNT(DISTINCT", driver_id, driveraccept_timestamp]
+    expected_chart: kpi
+    forbidden_keywords: ["FROM drivers"]
+
+  - question: "Средняя дистанция поездки по дням недели"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: [distance_in_meters, "AVG", "EXTRACT", "DOW", "GROUP BY"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM trips", "distance_km"]
+
+  - question: "Топ 5 городов по отменам клиентов за 30 дней"
+    expected_tables: [anonymized_incity_orders, cities]
+    expected_keywords: [clientcancel_timestamp, city_id, "COUNT", "GROUP BY", "LIMIT 5"]
+    expected_chart: bar
+    forbidden_keywords: ["status = 'cancelled'", "FROM orders"]
+
+  - question: "Выручка за прошлый месяц"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: [price_order_local, "SUM", order_timestamp]
+    expected_chart: kpi
+    forbidden_keywords: ["FROM payments", "p.amount", "FROM orders"]
+
+  - question: "Сколько поездок было за последние 7 дней"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: ["COUNT", order_timestamp]
+    expected_chart: kpi
+    forbidden_keywords: ["FROM trips", "FROM orders"]
+
+  - question: "Накопительная выручка за этот месяц"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: [price_order_local, "SUM", "DATE_TRUNC", order_timestamp]
+    expected_chart: line
+    forbidden_keywords: ["FROM payments", "p.amount"]
+
+  - question: "Среднее время подачи по городам за прошлую неделю"
+    expected_tables: [anonymized_incity_orders, cities]
+    expected_keywords: [driverarrived_timestamp, driveraccept_timestamp, "AVG", "EPOCH", city_id]
+    expected_chart: bar
+    forbidden_keywords: ["FROM drivers", "FROM trips"]
+
+  - question: "Какой средний чек у водителей"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: [price_order_local, "AVG", driver_id, "GROUP BY", "status_tender"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM drivers", "driverarrived_timestamp", "avg_pickup_min", "EPOCH"]
+
+  - question: "Средний чек у водителей за месяц"
+    expected_tables: [anonymized_incity_orders]
+    expected_keywords: [price_order_local, "AVG", driver_id, "GROUP BY", order_timestamp]
+    expected_chart: bar
+    forbidden_keywords: ["FROM drivers", "avg_pickup_min"]
+
+  # === Вопросы для driver_daily_stats ===
+
+  - question: "Среднее время онлайн водителей по городам за последний месяц"
+    expected_tables: [driver_daily_stats]
+    expected_keywords: [online_time_sum_seconds, "AVG", city_id, "GROUP BY"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM anonymized_incity_orders", "FROM orders", "order_timestamp"]
+
+  - question: "Acceptance rate водителей за последние 2 недели"
+    expected_tables: [driver_daily_stats]
+    expected_keywords: [orders_cnt_accepted, orders_cnt_with_tenders, "SUM", "GROUP BY"]
+    expected_chart: line
+    forbidden_keywords: ["FROM anonymized_incity_orders", "status_tender", "driveraccept_timestamp"]
+
+  - question: "Топ 10 водителей по суммарному времени онлайн за последний месяц"
+    expected_tables: [driver_daily_stats]
+    expected_keywords: [online_time_sum_seconds, driver_id, "SUM", "GROUP BY", "LIMIT 10"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM anonymized_incity_orders", "status_tender"]
+
+  - question: "Сколько новых водителей зарегистрировалось по месяцам за последний год"
+    expected_tables: [driver_daily_stats]
+    expected_keywords: [driver_reg_date, "COUNT(DISTINCT", driver_id, "DATE_TRUNC", "GROUP BY"]
+    expected_chart: line
+    forbidden_keywords: ["FROM anonymized_incity_orders", "order_timestamp", "FROM orders"]
+
+  - question: "Водители с acceptance rate ниже 30% за последние 30 дней"
+    expected_tables: [driver_daily_stats]
+    expected_keywords: [orders_cnt_accepted, orders_cnt_with_tenders, "HAVING", driver_id]
+    expected_chart: table
+    forbidden_keywords: ["FROM anonymized_incity_orders", "status_tender"]
+
+  # === Вопросы для passenger_daily_stats ===
+
+  - question: "Сколько новых пассажиров зарегистрировалось по неделям за последние 3 месяца"
+    expected_tables: [passenger_daily_stats]
+    expected_keywords: [user_reg_date, "COUNT(DISTINCT", user_id, "DATE_TRUNC", "GROUP BY"]
+    expected_chart: line
+    forbidden_keywords: ["FROM anonymized_incity_orders", "order_timestamp", "FROM users"]
+
+  - question: "Активные пассажиры по дням за последние 30 дней"
+    expected_tables: [passenger_daily_stats]
+    expected_keywords: [order_date_part, user_id, "COUNT(DISTINCT", "GROUP BY"]
+    expected_chart: line
+    forbidden_keywords: ["FROM anonymized_incity_orders", "order_timestamp"]
+
+  - question: "Среднее число поездок на пассажира по городам за последний месяц"
+    expected_tables: [passenger_daily_stats]
+    expected_keywords: [rides_count, "AVG", city_id, "GROUP BY"]
+    expected_chart: bar
+    forbidden_keywords: ["FROM anonymized_incity_orders", "status_tender"]
+
+  - question: "Пассажиры с более чем 5 отменами после принятия за последние 30 дней"
+    expected_tables: [passenger_daily_stats]
+    expected_keywords: [client_cancel_after_accept, user_id, "SUM", "HAVING", "GROUP BY"]
+    expected_chart: table
+    forbidden_keywords: ["FROM anonymized_incity_orders", "clientcancel_timestamp"]

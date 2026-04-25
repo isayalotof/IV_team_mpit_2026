@@ -1,0 +1,236 @@
+version: 2
+
+whitelist_tables:
+  - anonymized_incity_orders
+  - passenger_daily_stats
+  - driver_daily_stats
+  - cities
+
+# Real status values from anonymized_incity_orders:
+#   status_order: done | cancel | delete | accept
+#   status_tender: done | decline | cancel | accept | wait | '' (empty = no response)
+# One order_id → many tender_id rows (one per driver offer).
+# Completed trip = status_tender = 'done' (exactly one row per completed order).
+# Cancelled order = status_order = 'cancel'.
+status_values:
+  order_completed: "done"
+  order_cancelled: "cancel"
+  tender_won: "done"
+  tender_declined: "decline"
+
+metrics:
+  выручка:
+    description: "Сумма стоимости завершённых поездок в локальной валюте"
+    sql_expr: "SUM(price_order_local)"
+    base_table: "anonymized_incity_orders"
+    filters: "status_tender = 'done'"
+    format: "currency_local"
+
+  заказы:
+    description: "Количество уникальных созданных заказов"
+    sql_expr: "COUNT(DISTINCT order_id)"
+    base_table: "anonymized_incity_orders"
+    filters: ""
+    format: "integer"
+
+  поездки:
+    description: "Количество завершённых поездок"
+    sql_expr: "COUNT(*)"
+    base_table: "anonymized_incity_orders"
+    filters: "status_tender = 'done'"
+    format: "integer"
+
+  отмены:
+    description: "Количество отменённых заказов"
+    sql_expr: "COUNT(DISTINCT order_id)"
+    base_table: "anonymized_incity_orders"
+    filters: "status_order = 'cancel'"
+    format: "integer"
+
+  отмены_клиентом:
+    description: "Заказы, отменённые клиентом"
+    sql_expr: "COUNT(DISTINCT order_id)"
+    base_table: "anonymized_incity_orders"
+    filters: "clientcancel_timestamp IS NOT NULL"
+    format: "integer"
+
+  отмены_водителем:
+    description: "Заказы, отменённые водителем"
+    sql_expr: "COUNT(DISTINCT order_id)"
+    base_table: "anonymized_incity_orders"
+    filters: "drivercancel_timestamp IS NOT NULL"
+    format: "integer"
+
+  процент_отмен:
+    description: "Доля отменённых заказов от общего числа уникальных заказов"
+    sql_expr: "ROUND(100.0 * COUNT(DISTINCT CASE WHEN status_order = 'cancel' THEN order_id END) / NULLIF(COUNT(DISTINCT order_id), 0), 2)"
+    base_table: "anonymized_incity_orders"
+    filters: ""
+    format: "percent"
+
+  средний_чек:
+    description: "Средняя стоимость завершённой поездки"
+    sql_expr: "ROUND(AVG(price_order_local)::numeric, 2)"
+    base_table: "anonymized_incity_orders"
+    filters: "status_tender = 'done'"
+    format: "currency_local"
+
+  средняя_дистанция:
+    description: "Средняя дистанция поездки в километрах"
+    sql_expr: "ROUND((AVG(distance_in_meters) / 1000.0)::numeric, 2)"
+    base_table: "anonymized_incity_orders"
+    filters: "status_tender = 'done'"
+    format: "km"
+
+  средняя_длительность:
+    description: "Средняя длительность поездки в минутах"
+    sql_expr: "ROUND((AVG(duration_in_seconds) / 60.0)::numeric, 1)"
+    base_table: "anonymized_incity_orders"
+    filters: "status_tender = 'done'"
+    format: "minutes"
+
+  время_подачи:
+    description: "Среднее время от принятия заказа до прибытия водителя (мин)"
+    sql_expr: "ROUND((AVG(EXTRACT(EPOCH FROM (driverarrived_timestamp - driveraccept_timestamp))) / 60.0)::numeric, 1)"
+    base_table: "anonymized_incity_orders"
+    filters: "driverarrived_timestamp IS NOT NULL AND driveraccept_timestamp IS NOT NULL"
+    format: "minutes"
+
+  время_до_принятия:
+    description: "Среднее время от создания заказа до принятия водителем (сек)"
+    sql_expr: "ROUND(AVG(EXTRACT(EPOCH FROM (driveraccept_timestamp - order_timestamp)))::numeric, 1)"
+    base_table: "anonymized_incity_orders"
+    filters: "driveraccept_timestamp IS NOT NULL"
+    format: "seconds"
+
+  уникальные_клиенты:
+    description: "Количество уникальных клиентов"
+    sql_expr: "COUNT(DISTINCT user_id)"
+    base_table: "anonymized_incity_orders"
+    filters: ""
+    format: "integer"
+
+  активные_водители:
+    description: "Количество уникальных водителей с хотя бы одной завершённой поездкой"
+    sql_expr: "COUNT(DISTINCT driver_id)"
+    base_table: "anonymized_incity_orders"
+    filters: "status_tender = 'done'"
+    format: "integer"
+
+  онлайн_время_водителей:
+    description: "Среднее время онлайн водителей в часах (из driver_daily_stats)"
+    sql_expr: "ROUND((AVG(online_time_sum_seconds) / 3600.0)::numeric, 1)"
+    base_table: "driver_daily_stats"
+    filters: ""
+    format: "hours"
+
+  поездки_водителей_дневные:
+    description: "Среднее число поездок на водителя в день (из driver_daily_stats)"
+    sql_expr: "ROUND(AVG(rides_count)::numeric, 2)"
+    base_table: "driver_daily_stats"
+    filters: ""
+    format: "float"
+
+  поездки_пассажиров_дневные:
+    description: "Среднее число поездок на пассажира в день (из passenger_daily_stats)"
+    sql_expr: "ROUND(AVG(rides_count)::numeric, 2)"
+    base_table: "passenger_daily_stats"
+    filters: ""
+    format: "float"
+
+  конверсия_принятия:
+    description: "Доля заказов, принятых водителями (acceptance rate)"
+    sql_expr: "ROUND(100.0 * SUM(orders_cnt_accepted) / NULLIF(SUM(orders_cnt_with_tenders), 0), 1)"
+    base_table: "driver_daily_stats"
+    filters: ""
+    format: "percent"
+
+synonyms:
+  выручка: [выручка, выручки, выручке, выручку, доход, доходы, revenue, оборот, продажи, заработок]
+  заказы: [заказы, заказов, заказ, orders]
+  поездки: [поездки, поездок, поездка, trips, завершённые, завершённых]
+  отмены: [отмены, отмена, отказы, cancel, cancelled, отменённые]
+  отмены_клиентом: [отмены клиентом, клиент отменил, отменено клиентом, client cancel]
+  отмены_водителем: [отмены водителем, водитель отменил, отменено водителем, driver cancel]
+  процент_отмен: [процент отмен, доля отмен, cancel rate, коэффициент отмен, рейтинг отмен]
+  средний_чек: [средний чек, средняя стоимость, средняя цена, avg price, средняя сумма]
+  средняя_дистанция: [средняя дистанция, среднее расстояние, средний путь, avg distance, расстояние]
+  средняя_длительность: [средняя длительность, среднее время поездки, avg duration, длительность]
+  время_подачи: [время подачи, время прибытия водителя, pickup time, подача, ожидание водителя]
+  время_до_принятия: [время до принятия, время ответа водителя, accept time]
+  уникальные_клиенты: [уникальные клиенты, уникальные пользователи, unique users, клиентов всего]
+  активные_водители: [активные водители, active drivers, водителей всего]
+  онлайн_время_водителей: [онлайн время, время онлайн, online time, время в сети]
+  конверсия_принятия: [конверсия принятия, acceptance rate, доля принятых, принятие заказов]
+  город: [город, города, городам, городов, city, локация]
+  водитель: [водитель, водителей, водителя, driver]
+  клиент: [клиент, клиентов, пассажир, пассажиры, пользователь, пользователи, user]
+
+periods:
+  "сегодня":
+    start: "DATE_TRUNC('day', NOW())"
+    end: "NOW()"
+  "вчера":
+    start: "DATE_TRUNC('day', NOW()) - INTERVAL '1 day'"
+    end: "DATE_TRUNC('day', NOW())"
+  "эта неделя":
+    start: "DATE_TRUNC('week', NOW())"
+    end: "NOW()"
+  "прошлая неделя":
+    start: "DATE_TRUNC('week', NOW()) - INTERVAL '1 week'"
+    end: "DATE_TRUNC('week', NOW())"
+  "этот месяц":
+    start: "DATE_TRUNC('month', NOW())"
+    end: "NOW()"
+  "прошлый месяц":
+    start: "DATE_TRUNC('month', NOW()) - INTERVAL '1 month'"
+    end: "DATE_TRUNC('month', NOW())"
+  "последние 7 дней":
+    start: "NOW() - INTERVAL '7 days'"
+    end: "NOW()"
+  "последние 30 дней":
+    start: "NOW() - INTERVAL '30 days'"
+    end: "NOW()"
+  "этот год":
+    start: "DATE_TRUNC('year', NOW())"
+    end: "NOW()"
+
+dimensions:
+  город:
+    column: "city_id"
+    tables: [anonymized_incity_orders, passenger_daily_stats, driver_daily_stats]
+    join: "LEFT JOIN cities c ON c.city_id = o.city_id"
+    display_column: "c.name"
+  водитель:
+    column: "driver_id"
+    tables: [anonymized_incity_orders, driver_daily_stats]
+  клиент:
+    column: "user_id"
+    tables: [anonymized_incity_orders, passenger_daily_stats]
+  статус:
+    column: "status_order"
+    tables: [anonymized_incity_orders]
+  день:
+    column: "DATE_TRUNC('day', order_timestamp)"
+    tables: [anonymized_incity_orders]
+  день_водителя:
+    column: "tender_date_part"
+    tables: [driver_daily_stats]
+  день_пассажира:
+    column: "order_date_part"
+    tables: [passenger_daily_stats]
+  час:
+    column: "EXTRACT(HOUR FROM order_timestamp)::int"
+    tables: [anonymized_incity_orders]
+  день_недели:
+    column: "EXTRACT(DOW FROM order_timestamp)::int"
+    tables: [anonymized_incity_orders]
+  месяц:
+    column: "DATE_TRUNC('month', order_timestamp)"
+    tables: [anonymized_incity_orders]
+  дата_регистрации_водителя:
+    column: "driver_reg_date"
+    tables: [driver_daily_stats]
+  дата_регистрации_клиента:
+    column: "user_reg_date"
+    tables: [passenger_daily_stats]
